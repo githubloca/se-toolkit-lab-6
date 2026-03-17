@@ -1,30 +1,30 @@
 import subprocess
 import json
-import pytest
+import os
 
-def test_agent_output():
-    # Запускаем агент с простым вопросом
-    # Используем sys.executable для запуска через текущий интерпретатор
-    result = subprocess.run(
+def test_agent_json_format():
+    # Запускаем агента через python (или uv run)
+    # Передаем простой вопрос
+    process = subprocess.run(
         ["python3", "agent.py", "What is 2+2?"],
         capture_output=True,
         text=True
     )
     
-    # 1. Проверяем, что агент завершился без ошибок
-    assert result.returncode == 0
+    # Проверяем код возврата
+    assert process.returncode == 0, f"Agent failed with error: {process.stderr}"
     
-    # 2. Пытаемся распарсить вывод (stdout)
+    # Проверяем, что на выходе валидный JSON
     try:
-        data = json.loads(result.stdout.strip())
+        output = json.loads(process.stdout.strip())
     except json.JSONDecodeError:
-        pytest.fail("Agent output is not valid JSON")
+        assert False, f"Output is not valid JSON: {process.stdout}"
     
-    # 3. Проверяем наличие обязательных полей из задания
-    assert "answer" in data, "JSON must contain 'answer' field"
-    assert "tool_calls" in data, "JSON must contain 'tool_calls' field"
-    assert isinstance(data["tool_calls"], list), "'tool_calls' must be a list"
+    # Проверяем обязательные поля из задания
+    assert "answer" in output, "Missing 'answer' field"
+    assert "tool_calls" in output, "Missing 'tool_calls' field"
+    assert isinstance(output["tool_calls"], list), "'tool_calls' must be a list"
 
 if __name__ == "__main__":
-    test_agent_output()
-    print("Test passed locally!")
+    test_agent_json_format()
+    print("Test passed!")

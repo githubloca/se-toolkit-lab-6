@@ -46,12 +46,10 @@ tools = [
         "type": "function",
         "function": {
             "name": "list_files",
-            "description": "List files and directories at a given path.",
+            "description": "List files in a directory to discover wiki content.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Relative path from project root"}
-                },
+                "properties": {"path": {"type": "string"}},
                 "required": ["path"]
             }
         }
@@ -60,12 +58,10 @@ tools = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read a file from the project repository.",
+            "description": "Read the content of a file.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Relative path to the file"}
-                },
+                "properties": {"path": {"type": "string"}},
                 "required": ["path"]
             }
         }

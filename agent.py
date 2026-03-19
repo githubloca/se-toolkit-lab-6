@@ -4,19 +4,17 @@ import json
 import requests
 from openai import OpenAI
 from dotenv import load_dotenv
-import sys
-import io
 import time
 
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
+# Исправляем кодировку для Windows
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
     except:
         pass
 
+# Загружаем секреты
 load_dotenv(".env.agent.secret")
 load_dotenv(".env.docker.secret")
 
@@ -26,6 +24,7 @@ LLM_MODEL = os.getenv("LLM_MODEL")
 LMS_API_KEY = os.getenv("LMS_API_KEY")
 AGENT_API_BASE_URL = os.getenv("AGENT_API_BASE_URL", "http://localhost:42002")
 
+# --- Вспомогательные функции (Tools) ---
 
 def list_files(path: str = "."):
     try:
@@ -51,9 +50,7 @@ def read_file(path: str) -> str:
     return f"Error: File '{path}' not found."
 
 def query_api(method: str, path: str, body: str = None, include_auth: bool = None) -> str:
-   
     auth_enabled = (include_auth is not False)
-    
     url = f"{AGENT_API_BASE_URL.rstrip('/')}/{path.lstrip('/')}"
     headers = {"Content-Type": "application/json"}
     
@@ -72,7 +69,7 @@ def query_api(method: str, path: str, body: str = None, include_auth: bool = Non
         return json.dumps({"status": resp.status_code, "body": resp.text}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
-    
+
 tools = [
     {
         "type": "function",
@@ -116,8 +113,6 @@ tools = [
     }
 ]
 
-# --- Агент ---
-
 def run_agent(query):
     client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_API_BASE)
     messages = [
@@ -126,8 +121,8 @@ def run_agent(query):
             "content": (
                 "You are a Senior Backend Developer. To solve endpoint crashes:\n"
                 "1. DO NOT guess labs. Use 'list_files' to find the router (check backend/app/api/).\n"
-                "2. Use 'read_file' to examine the logic of '/top-learners'. Look for sorting (sorted(), .sort()) or access to missing keys.\n"
-                "3. Once you see the bug (e.g., sorting None values), call 'query_api' ONCE to confirm with a lab that causes it.\n"
+                "2. Use 'read_file' to examine the logic. Look for sorting or access to missing keys.\n"
+                "3. Once you see the bug, call 'query_api' ONCE to confirm.\n"
                 "4. Your final answer MUST include the 'source' path to the file with the bug.\n"
                 "5. BE FAST. Use max 5 steps."
             )
@@ -149,8 +144,7 @@ def run_agent(query):
             )
         except Exception as e:
             if "429" in str(e):
-                print("--- Rate limit hit, sleeping 15s... ---", file=sys.stderr)
-                time.sleep(15) # Ждем 15 секунд и пробуем ту же итерацию еще раз
+                time.sleep(15)
                 continue 
             return {"answer": f"LLM Error: {e}", "source": source_file, "tool_calls": history}
         
@@ -163,14 +157,11 @@ def run_agent(query):
                 "source": source_file, 
                 "tool_calls": history
             }
+        
         for tc in msg.tool_calls:
             name = tc.function.name
             args_str = tc.function.arguments
             
-            call_id = f"{name}:{args_str}"
-            if call_id in used_calls: continue 
-            used_calls.add(call_id)
-
             try:
                 args = json.loads(args_str)
             except:
@@ -184,7 +175,7 @@ def run_agent(query):
                 if res and not res.startswith("Error"):
                     source_file = path_val 
             elif name == "query_api":
-                res = query_api(args.get("method", "GET"), args.get("path", "/"), args.get("body"))
+                res = query_api(args.get("method", "GET"), args.get("path", "/"), args.get("body"), args.get("include_auth"))
             else:
                 res = "Unknown tool"
 

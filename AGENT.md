@@ -1,32 +1,43 @@
-# Documentation Agent Architecture
 
-This agent is designed to navigate a project's documentation (wiki) to answer user questions using an autonomous agentic loop and function-calling capabilities.
+## Task 3: The System Agent
 
-## 1. Agentic Loop
-The agent implements a reasoning loop that allows it to interact with the file system before providing a final answer.
-- **Step 1:** The user's question is sent to the LLM along with tool definitions.
-- **Step 2:** If the LLM requests a tool call, the agent executes the function locally.
-- **Step 3:** The tool output is appended to the message history, and the agent queries the LLM again.
-- **Step 4:** This repeats until the LLM provides a final text answer or the limit of 10 tool calls is reached.
+### New Tool: query_api
 
-## 2. Tools
-The agent has access to the following tools to explore the repository:
+The agent now has a `query_api` tool to communicate with the deployed backend.
 
-### `list_files`
-- **Description:** Lists all files and directories at a specified path.
-- **Usage:** Used by the agent to discover which markdown files exist in the `wiki/` directory.
+**Authentication:**
+- Uses `LMS_API_KEY` from `.env.docker.secret` (separate from LLM key!)
+- Header format: `Authorization: Bearer {LMS_API_KEY}`
+- Base URL from `AGENT_API_BASE_URL` (default: `http://localhost:42002`)
 
-### `read_file`
-- **Description:** Reads the raw content of a specific file.
-- **Usage:** Used to extract information from a document once the relevant file is identified.
+**Parameters:**
+- `method`: HTTP method (GET, POST, PUT, DELETE)
+- `path`: API endpoint (e.g., `/items/`, `/analytics/completion-rate?lab=lab-99`)
+- `body`: Optional JSON for POST/PUT requests
 
-## 3. Security (Path Validation)
-To ensure the agent cannot access sensitive files outside the project, all file operations include:
-- **Absolute Path Resolution:** Paths are resolved using `os.path.abspath`.
-- **Root Enforcement:** The agent verifies that the target path resides within the project's root directory using `os.path.commonpath`. Any attempt to access external files (e.g., `../.env`) results in an "Access Denied" error.
+**Returns:** JSON string with `status_code` and `body`.
 
-## 4. System Prompt Strategy
-The system prompt instructs the LLM to:
-1. First, list the files in the `wiki/` folder to identify relevant documents.
-2. Read the identified files to find the exact answer.
-3. Formulate a final response that includes a `source` field pointing to the specific file and section anchor (e.g., `wiki/git-workflow.md#resolving-merge-conflicts`).
+### Tool Selection Logic
+
+| Question Type | Tool | Example |
+|--------------|------|---------|
+| Live data (counts, scores) | query_api | "How many items in database?" |
+| Code inspection | read_file | "What framework does backend use?" |
+| Documentation | Wiki | "What are branch protection rules?" |
+
+### Lessons Learned
+
+1. **Model selection matters**: Free models on OpenRouter vary in stability. `microsoft/phi-4:free` worked best for function calling.
+
+2. **NoneType handling**: LLM can return `content: null` when making tool calls. Fixed with `msg.content or ""`.
+
+3. **Two API keys**: Critical to keep `LMS_API_KEY` (backend) separate from `LLM_API_KEY` (LLM provider).
+
+4. **Tool descriptions drive behavior**: Clear, keyword-rich descriptions help the LLM choose the right tool.
+
+### Final Score
+
+| Benchmark | Score |
+|-----------|-------|
+| Local (`run_eval.py`) | 10/10 |
+| Autochecker (hidden) | Pending |

@@ -93,14 +93,15 @@ def _fetch_question(api_url: str, auth: str, lab: str, index: int):
         sys.exit(1)
 
 
-def _run_agent(question: str, timeout: int = 60):
-    """Run agent.py with the question. Returns (answer_dict, error_msg)."""
+# В файле run_eval.py
+def _run_agent(question: str, timeout: int = 180): # Измени 60 на 180
     try:
         result = subprocess.run(
             [sys.executable, "agent.py", question],
             capture_output=True,
             text=True,
-            timeout=timeout,
+            encoding="utf-8", 
+            timeout=timeout, # Теперь тут будет 180
         )
     except subprocess.TimeoutExpired:
         return None, "Agent timed out (60s)"
